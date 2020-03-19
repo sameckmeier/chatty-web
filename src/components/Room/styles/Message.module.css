@@ -1,0 +1,10 @@
+.container {
+  display: inline-block;
+  overflow-y: scroll;
+  border: 1px solid black;
+  border-radius: 10px;
+  margin: 5px;
+  max-height: 5vw;
+  padding: 5px;
+  font-size: 12px;
+}

@@ -1,0 +1,24 @@
+.container {
+  display: flex;
+  justify-content: center;
+  padding: 0 10px 0 10px;
+  height: 100%;
+}
+
+.inputWrapper {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.messageInput {
+  flex: 3;
+  height: 65%;
+  margin-right: 10px;
+  border-radius: 10px;
+  resize: none;
+}
+
+.sendMessage {
+  flex: 1;
+}

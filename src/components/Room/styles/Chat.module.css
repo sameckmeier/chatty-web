@@ -1,0 +1,17 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.messageListWrapper {
+  flex: 9;
+  border: 1px solid black;
+  overflow: hidden;
+  overflow-y: scroll;
+}
+
+.messageInputWrapper {
+  flex: 1;
+  border: 1px solid black;
+}

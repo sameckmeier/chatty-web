@@ -1,0 +1,14 @@
+.container {
+  display: flex;
+  height: 100%;
+}
+
+.chatWrapper {
+  border: 1px solid black;
+  flex: 1;
+}
+
+.videoChatWrapper {
+  border: 1px solid black;
+  flex: 3;
+}
