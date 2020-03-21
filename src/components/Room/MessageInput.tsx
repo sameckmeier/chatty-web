@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import styles from './styles/MessageInput.module.css';
 
 interface Props {
-  createMessage: (content: string) => void;
+  addMessage: (content: string) => void;
 }
 
-export function MessageInput({ createMessage }: Props) {
+export function MessageInput({ addMessage }: Props) {
   const [content, setContent] = useState('');
 
   const onClick = () => {
-    createMessage(content);
+    addMessage(content);
     setContent('');
   };
 

@@ -1,31 +1,22 @@
-import React, { useState } from 'react';
+import React from 'react';
 import styles from './styles/Chat.module.css';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
+import { Message } from '../../domain/Message';
 
-let DATA: any = [...Array(40)].map(_ => ({ content: 'Ipsum Lorem' }));
-DATA = [
-  {
-    content:
-      'Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem Ipsum Lorem',
-  },
-  ...DATA,
-];
+interface Props {
+  messages: Message[];
+  addMessage(content: string): void;
+}
 
-export function Chat() {
-  const [messages, setMessages] = useState(DATA);
-
-  const createMessage = (content: string) => {
-    setMessages([{ content }, ...messages]);
-  };
-
+export function Chat({ messages, addMessage }: Props) {
   return (
     <div className={styles.container}>
       <div className={styles.messageListWrapper}>
         <MessageList messages={messages} />
       </div>
       <div className={styles.messageInputWrapper}>
-        <MessageInput createMessage={createMessage} />
+        <MessageInput addMessage={addMessage} />
       </div>
     </div>
   );
