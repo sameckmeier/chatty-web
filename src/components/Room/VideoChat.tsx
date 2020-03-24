@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import styles from './styles/VideoChat.module.css';
 import { Video } from './Video';
 import { ViewerList } from './ViewerList';

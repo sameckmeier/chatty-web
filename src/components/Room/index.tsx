@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import Peer from 'simple-peer';
-import WebSocket from 'ws';
 import styles from './styles/Room.module.css';
 import { Chat } from './Chat';
 import { VideoChat } from './VideoChat';
@@ -8,72 +7,94 @@ import { useMountEffect } from '../hooks';
 import {
   WebRTCPeerClient,
   IWebRTCPeerClient,
-  WEB_RTC_EVENTS,
 } from '../../clients/WebRTCPeerClient';
-import {
-  WebSocketClient,
-  IWebSocketClient,
-  WEB_SOCKET_EVENTS,
-} from '../../clients/WebSocketClient';
+import { WebSocketClient } from '../../clients/WebSocketClient';
 import { Message, createMessage, validateMessage } from '../../domain/Message';
 import env from '../../config/env';
+
+interface WebRTCPeerClientDict {
+  [key: string]: IWebRTCPeerClient;
+}
 
 interface State {
   messages: Message[];
 }
 
+const webRTCPeerClientDict: WebRTCPeerClientDict = {};
+
 export function Room() {
-  const [
-    webSocketClient,
-    setWebSocketClient,
-  ] = useState<IWebSocketClient | null>(null);
-  const [
-    webRTCPeerClient,
-    setWebRTCPeerClient,
-  ] = useState<IWebRTCPeerClient | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
 
-  useMountEffect(initConnections);
+  useMountEffect(() => {
+    const socket = new WebSocket(env.apiUrl());
+    const webSocketClient = new WebSocketClient(socket);
 
-  function initConnections() {
-    const socket = new WebSocket(env.host());
-    const peer = new Peer({ initiator: true });
-    const _webSocketClient = new WebSocketClient(socket);
-    const _webRTCClient = new WebRTCPeerClient(peer, _webSocketClient);
+    webSocketClient.registerPeerHandler(
+      ({ peerId: newPeerId, initiator }: any) => {
+        const peer = new Peer({ initiator, trickle: true });
+        const webRTCClient = new WebRTCPeerClient(peer);
 
-    setWebSocketClient(_webSocketClient);
-    setWebRTCPeerClient(_webRTCClient);
+        webRTCClient.registerConnectionHandler(() => {
+          console.log(`WebRTC connection ready`);
+          webRTCPeerClientDict[newPeerId] = webRTCClient;
+        });
 
-    _webSocketClient.connect(() => {
-      _webRTCClient.registerSignalHanders();
+        webRTCClient.registerSignalHandler((data: any) => {
+          webSocketClient.emitSignal({ peerId: newPeerId, signal: data });
+        });
 
-      _webRTCClient.registerDataHandler((data: any) => {
-        setMessages(data);
-      });
+        webRTCClient.registerDataHandler((data: any) => {
+          try {
+            const message = JSON.parse(data);
+            updateMessages(message);
+          } catch (err) {
+            console.log(err);
+          }
+        });
+
+        webRTCPeerClientDict[newPeerId] = webRTCClient;
+      },
+    );
+
+    webSocketClient.registerSignalHandler((data: any) => {
+      const peer = webRTCPeerClientDict[data.peerId];
+
+      if (peer) {
+        console.log(
+          `Received signalling data ${data} from Peer ID: ${data.peerId}`,
+        );
+
+        peer.signal(data.signal);
+      }
     });
 
     return () => {
-      _webRTCClient.cleanUp(() => {
-        _webSocketClient.cleanUp();
+      const webRTCClients = Object.values(webRTCPeerClientDict);
+      webRTCClients.forEach((webRTCClient: IWebRTCPeerClient) => {
+        webRTCClient.cleanUp();
       });
-    };
-  }
 
-  async function addMessage(content: string) {
+      webSocketClient.cleanUp();
+    };
+  });
+
+  const updateMessages = (message: Message) => {
+    setMessages((prevMessages: Message[]) => [...prevMessages, message]);
+  };
+
+  const addMessage = async (content: string) => {
     try {
       const message = createMessage(content);
 
       await validateMessage(message);
 
-      setMessages([message, ...messages]);
+      updateMessages(message);
 
-      if (webRTCPeerClient) {
-        webRTCPeerClient.emit(message);
-      }
+      Object.values(webRTCPeerClientDict).forEach(peer => peer.emit(message));
     } catch (err) {
       console.log(err);
     }
-  }
+  };
 
   return (
     <div className={styles.container}>

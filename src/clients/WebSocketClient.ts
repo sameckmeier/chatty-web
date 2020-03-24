@@ -1,36 +1,63 @@
+export enum WEB_SOCKET_CHANNELS {
+  MESSAGE = 'message',
+  OPEN = 'open',
+}
+
 export enum WEB_SOCKET_EVENTS {
   SIGNAL = 'signal',
-  CONNECT = 'open',
-  DISCONNECT = 'disconnect',
+  PEER = 'peer',
+  CONNECTED = 'connected',
 }
 
 export interface IWebSocketClient {
-  emit(EVENTS: string, payload: any): void;
-  registerHandler(type: string, fn: any): void;
-  connect(fn: any): void;
+  registerConnectionHandler(fn: any): void;
+  registerPeerHandler(fn: any): void;
+  registerSignalHandler(fn: any): void;
+  emitSignal(data: any): void;
   cleanUp(fn?: any): void;
 }
 
 export class WebSocketClient implements IWebSocketClient {
-  constructor(private socket: any) {}
+  private messageHandlers: any[];
 
-  emit(EVENTS: string, payload: any) {
-    this.socket.emit(EVENTS, JSON.stringify(payload));
+  constructor(private socket: WebSocket) {
+    this.messageHandlers = [];
+
+    this.socket.onmessage = (event: any) => {
+      this.messageHandlers.forEach(handler => {
+        handler(event.data);
+      });
+    };
   }
 
-  registerHandler(type: string, fn: any) {
-    this.socket.on(type, fn);
+  registerConnectionHandler(fn: any) {
+    this.registerMessageHandler(WEB_SOCKET_EVENTS.CONNECTED, fn);
   }
 
-  connect(fn: any) {
-    this.registerHandler(WEB_SOCKET_EVENTS.CONNECT, fn);
+  registerPeerHandler(fn: any) {
+    this.registerMessageHandler(WEB_SOCKET_EVENTS.PEER, fn);
   }
 
-  cleanUp(fn?: any) {
-    if (fn) {
-      this.registerHandler(WEB_SOCKET_EVENTS.DISCONNECT, fn);
-    }
+  registerSignalHandler(fn: any) {
+    this.registerMessageHandler(WEB_SOCKET_EVENTS.SIGNAL, fn);
+  }
 
-    this.socket.disconnect();
+  emitSignal(data: any) {
+    const json = JSON.stringify({ type: WEB_SOCKET_EVENTS.SIGNAL, ...data });
+    this.socket.send(json);
+  }
+
+  cleanUp() {
+    this.socket.close();
+  }
+
+  private registerMessageHandler(event: string, fn: any) {
+    this.messageHandlers.push((json: string) => {
+      const data = JSON.parse(json);
+
+      if (data.type === event) {
+        fn(data);
+      }
+    });
   }
 }
