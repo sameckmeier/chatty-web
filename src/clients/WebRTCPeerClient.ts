@@ -6,6 +6,7 @@ export enum WEB_RTC_EVENTS {
   SIGNAL = 'signal',
   CONNECT = 'connect',
   ERROR = 'error',
+  STREAM = 'stream',
 }
 
 export interface IWebRTCPeerClient {
@@ -15,6 +16,8 @@ export interface IWebRTCPeerClient {
   registerErrorHandler(fn: any): void;
   registerDataHandler(fn: any): void;
   registerSignalHandler(fn: any): void;
+  registerStreamHandler(fn: any): void;
+  registerDisconnectHandler(fn: any): void;
   cleanUp(fn?: any): void;
 }
 
@@ -33,6 +36,10 @@ export class WebRTCPeerClient implements IWebRTCPeerClient {
     this.registerHandler(WEB_RTC_EVENTS.CONNECT, fn);
   }
 
+  registerStreamHandler(fn: any) {
+    this.registerHandler(WEB_RTC_EVENTS.STREAM, fn);
+  }
+
   registerErrorHandler(fn: any) {
     this.registerHandler(WEB_RTC_EVENTS.ERROR, fn);
   }
@@ -43,6 +50,10 @@ export class WebRTCPeerClient implements IWebRTCPeerClient {
 
   registerSignalHandler(fn: any) {
     this.registerHandler(WEB_RTC_EVENTS.SIGNAL, fn);
+  }
+
+  registerDisconnectHandler(fn: any) {
+    this.registerHandler(WEB_RTC_EVENTS.CLOSE, fn);
   }
 
   cleanUp() {

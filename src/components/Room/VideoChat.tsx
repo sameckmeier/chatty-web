@@ -3,18 +3,20 @@ import styles from './styles/VideoChat.module.css';
 import { Video } from './Video';
 import { ViewerList } from './ViewerList';
 
-const viewerConnections: any = [...Array(8)].map(_ => ({}));
-const presenterConnection: any = {};
+interface Props {
+  presenterStream: any;
+  viewerStreams: any[];
+}
 
-export function VideoChat() {
+export function VideoChat({ presenterStream, viewerStreams }: Props) {
   return (
     <div className={styles.container}>
       <div className={styles.presenterWrapper}>
-        <Video connection={presenterConnection} />
+        <Video stream={presenterStream} muted={true} />
       </div>
       <div className={styles.overlay}>
         <div className={styles.viewerListWrapper}>
-          <ViewerList viewerConnections={viewerConnections} />
+          <ViewerList viewerStreams={viewerStreams} />
         </div>
       </div>
     </div>
