@@ -4,26 +4,23 @@ import styles from './styles/Room.module.css';
 import { Chat } from './Chat';
 import { VideoChat } from './VideoChat';
 import { useMountEffect } from '../hooks';
-import {
-  WebRTCPeerClient,
-  IWebRTCPeerClient,
-} from '../../clients/WebRTCPeerClient';
+import { WebRTCPeer, IWebRTCPeer } from '../../infra/web-rtc/WebRTCPeer';
 import {
   WebSocketClient,
   IWebSocketClient,
-} from '../../clients/WebSocketClient';
+} from '../../infra/socket/WebSocketClient';
 import { Message, createMessage, validateMessage } from '../../domain/Message';
 import env from '../../config/env';
 
-interface WebRTCPeerClientDict {
-  [key: string]: IWebRTCPeerClient;
+interface WebRTCPeerDict {
+  [key: string]: IWebRTCPeer;
 }
 
 interface webRTCPeerStreamDict {
   [key: string]: MediaStream;
 }
 
-const webRTCPeerClientDict: WebRTCPeerClientDict = {};
+const WebRTCPeerDict: WebRTCPeerDict = {};
 const webRTCPeerStreamDict: webRTCPeerStreamDict = {};
 
 export function Room() {
@@ -51,9 +48,9 @@ export function Room() {
     );
 
     return () => {
-      const webRTCClients = Object.values(webRTCPeerClientDict);
-      webRTCClients.forEach((webRTCClient: IWebRTCPeerClient) => {
-        webRTCClient.cleanUp();
+      const webRTCPeers = Object.values(WebRTCPeerDict);
+      webRTCPeers.forEach((webRTCPeer: IWebRTCPeer) => {
+        webRTCPeer.cleanUp();
       });
 
       webSocketClient && webSocketClient.cleanUp();
@@ -64,13 +61,13 @@ export function Room() {
     webSocketClient: IWebSocketClient,
     stream: MediaStream,
   ): void => {
-    webSocketClient.registerPeerHandler(
+    webSocketClient.registerPeerHandlerHandler(
       ({ peerId: newPeerId, initiator }: any) => {
         const peer = new Peer({ initiator, stream, trickle: true });
-        const webRTCClient = new WebRTCPeerClient(peer);
-        webRTCPeerClientDict[newPeerId] = webRTCClient;
+        const webRTCPeer = new WebRTCPeer(peer);
+        WebRTCPeerDict[newPeerId] = webRTCPeer;
 
-        webRTCClient.registerConnectionHandler(() => {
+        webRTCPeer.registerConnectionHandler(() => {
           try {
             console.log(`WebRTC connection ready with ${newPeerId}`);
           } catch (err) {
@@ -78,7 +75,7 @@ export function Room() {
           }
         });
 
-        webRTCClient.registerDisconnectHandler(() => {
+        webRTCPeer.registerDisconnectHandler(() => {
           try {
             console.log(`Disconnecting with ${newPeerId}`);
 
@@ -88,14 +85,14 @@ export function Room() {
               prevViewerStreams.filter(s => s.id !== stream.id),
             );
 
-            webRTCPeerClientDict[newPeerId].cleanUp();
-            delete webRTCPeerClientDict.newPeerId;
+            WebRTCPeerDict[newPeerId].cleanUp();
+            delete WebRTCPeerDict.newPeerId;
           } catch (err) {
             console.log(err);
           }
         });
 
-        webRTCClient.registerSignalHandler((data: any) => {
+        webRTCPeer.registerSignalHandler((data: any) => {
           try {
             webSocketClient.emitSignal({ peerId: newPeerId, signal: data });
           } catch (err) {
@@ -103,7 +100,7 @@ export function Room() {
           }
         });
 
-        webRTCClient.registerDataHandler((data: any) => {
+        webRTCPeer.registerDataHandler((data: any) => {
           try {
             const message = JSON.parse(data);
             updateMessages(message);
@@ -112,7 +109,7 @@ export function Room() {
           }
         });
 
-        webRTCClient.registerStreamHandler((stream: any) => {
+        webRTCPeer.registerStreamHandler((stream: any) => {
           try {
             console.log(`Received stream from ${newPeerId}`);
             webRTCPeerStreamDict[newPeerId] = stream;
@@ -125,7 +122,7 @@ export function Room() {
           }
         });
 
-        webRTCClient.registerErrorHandler((err: Error) => {
+        webRTCPeer.registerErrorHandler((err: Error) => {
           console.log(`Received error from ${newPeerId}`);
           console.log(err);
         });
@@ -133,7 +130,7 @@ export function Room() {
     );
 
     webSocketClient.registerSignalHandler((data: any): void => {
-      const peer = webRTCPeerClientDict[data.peerId];
+      const peer = WebRTCPeerDict[data.peerId];
 
       if (peer) {
         console.log(
@@ -157,7 +154,7 @@ export function Room() {
 
       updateMessages(message);
 
-      Object.values(webRTCPeerClientDict).forEach(peer => peer.emit(message));
+      Object.values(WebRTCPeerDict).forEach(peer => peer.emit(message));
     } catch (err) {
       console.log(err);
     }

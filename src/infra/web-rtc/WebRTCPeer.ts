@@ -9,7 +9,8 @@ export enum WEB_RTC_EVENTS {
   STREAM = 'stream',
 }
 
-export interface IWebRTCPeerClient {
+export interface IWebRTCPeer {
+  id: string;
   signal(data: any): void;
   emit(payload: any): void;
   registerConnectionHandler(fn: any): void;
@@ -21,8 +22,14 @@ export interface IWebRTCPeerClient {
   cleanUp(fn?: any): void;
 }
 
-export class WebRTCPeerClient implements IWebRTCPeerClient {
-  constructor(private peer: Peer.Instance) {}
+export class WebRTCPeer implements IWebRTCPeer {
+  public id: string;
+  private peer: Peer.Instance;
+
+  constructor(id: string, peer: Peer.Instance) {
+    this.id = id;
+    this.peer = peer;
+  }
 
   signal(data: any) {
     this.peer.signal(data);

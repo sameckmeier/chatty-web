@@ -1,3 +1,5 @@
+import { IWebRTCPeerManager } from '../web-rtc/WebRTCPeerManager';
+
 export enum WEB_SOCKET_CHANNELS {
   MESSAGE = 'message',
   OPEN = 'open',
@@ -10,9 +12,8 @@ export enum WEB_SOCKET_EVENTS {
 }
 
 export interface IWebSocketClient {
-  registerConnectionHandler(fn: any): void;
-  registerPeerHandler(fn: any): void;
-  registerSignalHandler(fn: any): void;
+  registerPeerHandler(stream: any, webRTCPeerManager: IWebRTCPeerManager): void;
+  registerSignalHandler(webRTCPeerManager: IWebRTCPeerManager): void;
   emitSignal(data: any): void;
   cleanUp(fn?: any): void;
 }
@@ -30,16 +31,27 @@ export class WebSocketClient implements IWebSocketClient {
     };
   }
 
-  registerConnectionHandler(fn: any) {
-    this.registerMessageHandler(WEB_SOCKET_EVENTS.CONNECTED, fn);
+  registerPeerHandler(stream: any, webRTCPeerManager: IWebRTCPeerManager) {
+    this.registerMessageHandler(
+      WEB_SOCKET_EVENTS.PEER,
+      ({ peerId, initiator }: any) => {
+        webRTCPeerManager.add({ id: peerId, initiator, stream, trickle: true });
+      },
+    );
   }
 
-  registerPeerHandler(fn: any) {
-    this.registerMessageHandler(WEB_SOCKET_EVENTS.PEER, fn);
-  }
+  registerSignalHandler(webRTCPeerManager: IWebRTCPeerManager) {
+    this.registerMessageHandler(WEB_SOCKET_EVENTS.SIGNAL, (data: any) => {
+      const peer = webRTCPeerManager.get(data.peerId);
 
-  registerSignalHandler(fn: any) {
-    this.registerMessageHandler(WEB_SOCKET_EVENTS.SIGNAL, fn);
+      if (peer) {
+        console.log(
+          `Received signalling data ${data} from Peer ID: ${data.peerId}`,
+        );
+
+        peer.signal(data.signal);
+      }
+    });
   }
 
   emitSignal(data: any) {
