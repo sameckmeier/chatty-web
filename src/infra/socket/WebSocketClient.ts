@@ -20,9 +20,11 @@ export interface IWebSocketClient {
 
 export class WebSocketClient implements IWebSocketClient {
   private messageHandlers: any[];
+  private socket: WebSocket;
 
-  constructor(private socket: WebSocket) {
+  constructor(socket: WebSocket) {
     this.messageHandlers = [];
+    this.socket = socket;
 
     this.socket.onmessage = (event: any) => {
       this.messageHandlers.forEach(handler => {

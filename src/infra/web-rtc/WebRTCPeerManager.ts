@@ -6,21 +6,23 @@ import {
 
 export interface IWebRTCPeerManager {
   add(args: CreateWebRTCPeerParams): void;
+  emit(data: any): void;
   get(id: string): IWebRTCPeer;
+  cleanUp(): void;
 }
 
 export class WebRTCPeerManager {
   private peerDict: { [key: string]: IWebRTCPeer };
   private streamDict: { [key: string]: MediaStream };
   private webRTCPeerFactory: IWebRTCPeerFactory;
-  private onData: (json: string) => void;
+  private onData: (data: any) => void;
   private onStream: (stream: any) => void;
   private onSignal: (data: any, peer: IWebRTCPeer) => void;
   private onDisconnect: (stream: MediaStream) => void;
 
   constructor(args: {
     webRTCPeerFactory: IWebRTCPeerFactory;
-    onData: (json: string) => void;
+    onData: (data: any) => void;
     onStream: (stream: any) => void;
     onSignal: (data: any, peer: IWebRTCPeer) => void;
     onDisconnect: (stream: MediaStream) => void;
@@ -34,7 +36,7 @@ export class WebRTCPeerManager {
     this.onDisconnect = args.onDisconnect;
   }
 
-  public add(args: CreateWebRTCPeerParams) {
+  add(args: CreateWebRTCPeerParams) {
     const webRTCPeer = this.webRTCPeerFactory.create(args);
     this.peerDict[webRTCPeer.id] = webRTCPeer;
 
@@ -63,8 +65,19 @@ export class WebRTCPeerManager {
     });
   }
 
-  public get(id: string): IWebRTCPeer {
+  emit(data: any): void {
+    Object.values(this.peerDict).forEach(peer => peer.emit(data));
+  }
+
+  get(id: string): IWebRTCPeer {
     return this.peerDict[id];
+  }
+
+  cleanUp(): void {
+    const webRTCPeers = Object.values(this.peerDict);
+    webRTCPeers.forEach((webRTCPeer: IWebRTCPeer) => {
+      webRTCPeer.cleanUp();
+    });
   }
 
   private onConnection(peer: IWebRTCPeer) {

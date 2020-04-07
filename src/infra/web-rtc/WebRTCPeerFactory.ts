@@ -13,7 +13,7 @@ export interface IWebRTCPeerFactory {
 }
 
 export class WebRTCPeerFactory implements IWebRTCPeerFactory {
-  public create(args: CreateWebRTCPeerParams): IWebRTCPeer {
+  create(args: CreateWebRTCPeerParams): IWebRTCPeer {
     const { id, ...peerArgs } = args;
     const peer = new Peer(peerArgs);
     return new WebRTCPeer(id, peer);

@@ -23,7 +23,7 @@ export interface IWebRTCPeer {
 }
 
 export class WebRTCPeer implements IWebRTCPeer {
-  public id: string;
+  id: string;
   private peer: Peer.Instance;
 
   constructor(id: string, peer: Peer.Instance) {

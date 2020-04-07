@@ -1,27 +1,24 @@
 import React, { useState } from 'react';
-import Peer from 'simple-peer';
 import styles from './styles/Room.module.css';
 import { Chat } from './Chat';
 import { VideoChat } from './VideoChat';
 import { useMountEffect } from '../hooks';
-import { WebRTCPeer, IWebRTCPeer } from '../../infra/web-rtc/WebRTCPeer';
+import { IWebRTCPeer } from '../../infra/web-rtc/WebRTCPeer';
 import {
   WebSocketClient,
   IWebSocketClient,
 } from '../../infra/socket/WebSocketClient';
 import { Message, createMessage, validateMessage } from '../../domain/Message';
 import env from '../../config/env';
+import BrowserMediaManager from '../../infra/browser/BrowserMediaManager';
+import {
+  WebRTCPeerManager,
+  IWebRTCPeerManager,
+} from '../../infra/web-rtc/WebRTCPeerManager';
+import { WebRTCPeerFactory } from '../../infra/web-rtc/WebRTCPeerFactory';
 
-interface WebRTCPeerDict {
-  [key: string]: IWebRTCPeer;
-}
-
-interface webRTCPeerStreamDict {
-  [key: string]: MediaStream;
-}
-
-const WebRTCPeerDict: WebRTCPeerDict = {};
-const webRTCPeerStreamDict: webRTCPeerStreamDict = {};
+let webSocketClient: IWebSocketClient;
+let webRTCPeerManager: IWebRTCPeerManager;
 
 export function Room() {
   const [presenterStream, setPresenterStream] = useState<MediaStream | null>(
@@ -29,124 +26,56 @@ export function Room() {
   );
   const [viewerStreams, setViewerStreams] = useState<MediaStream[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [
-    webSocketClient,
-    setWebSocketClient,
-  ] = useState<IWebSocketClient | null>(null);
 
   useMountEffect(() => {
-    navigator.getUserMedia(
-      { video: true, audio: true },
-      stream => {
-        const socket = new WebSocket(env.apiUrl());
-        const webSocketClient = new WebSocketClient(socket);
-        setWebSocketClient(webSocketClient);
-        setPresenterStream(stream);
-        addPeer(webSocketClient, stream);
+    const socket = new WebSocket(env.apiUrl());
+    webSocketClient = new WebSocketClient(socket);
+
+    const webRTCPeerFactory = new WebRTCPeerFactory();
+    webRTCPeerManager = new WebRTCPeerManager({
+      webRTCPeerFactory,
+      onData: updateMessages,
+      onStream: (stream: MediaStream): void => {
+        setViewerStreams((prevViewerStreams: MediaStream[]) => [
+          ...prevViewerStreams,
+          stream,
+        ]);
       },
-      () => {},
-    );
+      onSignal: (data: any, peer: IWebRTCPeer): void => {
+        try {
+          webSocketClient.emitSignal({ peerId: peer.id, signal: data });
+        } catch (err) {
+          console.log(err);
+        }
+      },
+      onDisconnect: (stream: MediaStream): void => {
+        setViewerStreams((prevViewerStreams: MediaStream[]) =>
+          prevViewerStreams.filter(s => s.id !== stream.id),
+        );
+      },
+    });
+
+    BrowserMediaManager.getMedia((stream: MediaStream) => {
+      webSocketClient.registerPeerHandler(stream, webRTCPeerManager);
+      webSocketClient.registerSignalHandler(webRTCPeerManager);
+      setPresenterStream(stream);
+    });
 
     return () => {
-      const webRTCPeers = Object.values(WebRTCPeerDict);
-      webRTCPeers.forEach((webRTCPeer: IWebRTCPeer) => {
-        webRTCPeer.cleanUp();
-      });
-
-      webSocketClient && webSocketClient.cleanUp();
+      webRTCPeerManager.cleanUp();
+      webSocketClient.cleanUp();
     };
   });
 
-  const addPeer = (
-    webSocketClient: IWebSocketClient,
-    stream: MediaStream,
-  ): void => {
-    webSocketClient.registerPeerHandlerHandler(
-      ({ peerId: newPeerId, initiator }: any) => {
-        const peer = new Peer({ initiator, stream, trickle: true });
-        const webRTCPeer = new WebRTCPeer(peer);
-        WebRTCPeerDict[newPeerId] = webRTCPeer;
-
-        webRTCPeer.registerConnectionHandler(() => {
-          try {
-            console.log(`WebRTC connection ready with ${newPeerId}`);
-          } catch (err) {
-            console.log(err);
-          }
-        });
-
-        webRTCPeer.registerDisconnectHandler(() => {
-          try {
-            console.log(`Disconnecting with ${newPeerId}`);
-
-            const stream = webRTCPeerStreamDict[newPeerId];
-
-            setViewerStreams((prevViewerStreams: MediaStream[]) =>
-              prevViewerStreams.filter(s => s.id !== stream.id),
-            );
-
-            WebRTCPeerDict[newPeerId].cleanUp();
-            delete WebRTCPeerDict.newPeerId;
-          } catch (err) {
-            console.log(err);
-          }
-        });
-
-        webRTCPeer.registerSignalHandler((data: any) => {
-          try {
-            webSocketClient.emitSignal({ peerId: newPeerId, signal: data });
-          } catch (err) {
-            console.log(err);
-          }
-        });
-
-        webRTCPeer.registerDataHandler((data: any) => {
-          try {
-            const message = JSON.parse(data);
-            updateMessages(message);
-          } catch (err) {
-            console.log(err);
-          }
-        });
-
-        webRTCPeer.registerStreamHandler((stream: any) => {
-          try {
-            console.log(`Received stream from ${newPeerId}`);
-            webRTCPeerStreamDict[newPeerId] = stream;
-            setViewerStreams((prevViewerStreams: MediaStream[]) => [
-              ...prevViewerStreams,
-              stream,
-            ]);
-          } catch (err) {
-            console.log(err);
-          }
-        });
-
-        webRTCPeer.registerErrorHandler((err: Error) => {
-          console.log(`Received error from ${newPeerId}`);
-          console.log(err);
-        });
-      },
-    );
-
-    webSocketClient.registerSignalHandler((data: any): void => {
-      const peer = WebRTCPeerDict[data.peerId];
-
-      if (peer) {
-        console.log(
-          `Received signalling data ${data} from Peer ID: ${data.peerId}`,
-        );
-
-        peer.signal(data.signal);
-      }
-    });
-  };
-
   const updateMessages = (message: Message): void => {
-    setMessages((prevMessages: Message[]) => [...prevMessages, message]);
+    try {
+      setMessages((prevMessages: Message[]) => [...prevMessages, message]);
+    } catch (err) {
+      console.log(err);
+    }
   };
 
-  const addMessage = async (content: string) => {
+  const addMessage = async (content: string): Promise<void> => {
     try {
       const message = createMessage(content);
 
@@ -154,7 +83,7 @@ export function Room() {
 
       updateMessages(message);
 
-      Object.values(WebRTCPeerDict).forEach(peer => peer.emit(message));
+      webRTCPeerManager.emit(message);
     } catch (err) {
       console.log(err);
     }
